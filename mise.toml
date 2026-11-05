@@ -7,12 +7,12 @@ gh = "2.102.0"
 rust = { version = "1.99.1", components = "clippy,rustfmt" }
 
 [tasks.test]
-description = "Run the workspace tests"
-run = "cargo test --workspace"
+description = "Run the workspace tests with the headless server"
+run = "cargo test --workspace --features miniban-server/headless"
 
 [tasks."check:back"]
-description = "Run Clippy on all targets with warnings as errors"
-run = "cargo clippy --workspace --all-targets -- -D warnings"
+description = "Run Clippy on all targets with the headless server and warnings as errors"
+run = "cargo clippy --workspace --all-targets --features miniban-server/headless -- -D warnings"
 
 [tasks.fmt]
 description = "Format the whole repository"

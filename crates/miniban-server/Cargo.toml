@@ -1,0 +1,17 @@
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+
+[package]
+name = "miniban-server"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Miniban HTTP server"
+
+[[bin]]
+name = "miniban"
+path = "src/main.rs"
+
+[dependencies]
+miniban-core.workspace = true

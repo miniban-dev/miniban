@@ -1,0 +1,23 @@
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+
+[tools]
+deno = "2.9.8"
+dprint = "0.64.3"
+gh = "2.102.0"
+rust = { version = "1.99.1", components = "clippy,rustfmt" }
+
+[tasks.test]
+description = "Run the workspace tests"
+run = "cargo test --workspace"
+
+[tasks."check:back"]
+description = "Run Clippy on all targets with warnings as errors"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+
+[tasks.fmt]
+description = "Format the whole repository"
+run = ["dprint fmt", "cargo fmt --all"]
+
+[tasks."fmt:check"]
+description = "Verify formatting across the whole repository"
+run = ["dprint check", "cargo fmt --all -- --check"]

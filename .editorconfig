@@ -1,0 +1,14 @@
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.rs]
+indent_size = 4

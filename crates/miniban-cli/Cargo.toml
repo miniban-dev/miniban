@@ -1,0 +1,18 @@
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+
+[package]
+name = "miniban-cli"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Miniban command-line interface"
+
+[[bin]]
+name = "mb"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+miniban-core.workspace = true

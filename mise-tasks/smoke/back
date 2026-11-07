@@ -10,9 +10,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 # Checks that a GET request returns JSON with exactly this status and body.
 expect_json() {
-  get "$1"
-  expect_equal "GET $1: status" "$2" "$response_status"
-  expect_equal "GET $1: content type" application/json "$response_type"
+  expect_response "$1" "$2" application/json
   expect_equal "GET $1: body" "$3" "$response_body"
   echo "smoke: ok: GET $1 returns $2 with $3"
 }

@@ -7,7 +7,7 @@
 # Binaries run from that directory with an empty environment, so they can't rely on frontend files in the
 # repository or on tools such as Deno and Node.js on the PATH.
 #
-# Key functions: start_server, get, expect_equal, expect_html, run_mb.
+# Key functions: start_server, expect_equal, expect_response, run_mb.
 
 work_dir=$(mktemp -d)
 readonly work_dir
@@ -90,12 +90,12 @@ start_server() {
 # Sends a GET request and stores the outcome in response_status, response_type and response_body. Failing
 # if the server has stopped also catches another process having taken the port during startup.
 get() {
-  local written
-  written=$(curl --silent --show-error --noproxy '*' --max-time 5 --output "$work_dir/body" \
+  local status_and_type
+  status_and_type=$(curl --silent --show-error --noproxy '*' --max-time 5 --output "$work_dir/body" \
     --write-out '%{http_code} %{content_type}' "$base_url$1") || die "GET $1: no response"
   kill -0 "$server_pid" 2>/dev/null || die "GET $1: miniban stopped"
-  response_status=${written%% *}
-  response_type=${written#* }
+  response_status=${status_and_type%% *}
+  response_type=${status_and_type#* }
   response_body=$(<"$work_dir/body")
 }
 
@@ -105,13 +105,12 @@ expect_equal() {
   [[ $actual == "$expected" ]] || die "$label: expected '$expected', got '$actual'"
 }
 
-# Checks that a GET request returns the HTML document with status 200.
-expect_html() {
-  get "$1"
-  expect_equal "GET $1: status" 200 "$response_status"
-  expect_equal "GET $1: content type" 'text/html; charset=utf-8' "$response_type"
-  [[ $response_body == '<!DOCTYPE html>'* ]] || die "GET $1: body is not an HTML document"
-  echo "smoke: ok: GET $1 returns the HTML document"
+# Sends a GET request and fails unless the response has exactly this status and content type.
+expect_response() {
+  local path=$1 status=$2 content_type=$3
+  get "$path"
+  expect_equal "GET $path: status" "$status" "$response_status"
+  expect_equal "GET $path: content type" "$content_type" "$response_type"
 }
 
 # Runs the release mb with an argument, failing unless it succeeds and prints something.

@@ -8,6 +8,13 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+# Checks that a GET request returns the HTML document with status 200.
+expect_html() {
+  expect_response "$1" 200 'text/html; charset=utf-8'
+  [[ $response_body == '<!DOCTYPE html>'* ]] || die "GET $1: body is not an HTML document"
+  echo "smoke: ok: GET $1 returns the HTML document"
+}
+
 start_server 3102
 expect_html /
 expect_html /board/1

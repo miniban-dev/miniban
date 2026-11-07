@@ -45,7 +45,6 @@ Place Rust tests after business logic in a module underneath this comment line:
 
 - **ALWAYS** run `check`, `test`, and `fmt` mise tasks before finishing a task
 - **ALWAYS** ask before adding new dependencies, giving the user the choice, unless already named explicitly in a ticket
-- **NEVER** push yourself unless the user asks you to explicitly
 
 ## Agent skills
 

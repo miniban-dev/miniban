@@ -6,6 +6,33 @@ dprint = "0.64.3"
 gh = "2.102.0"
 rust = { version = "1.99.1", components = "clippy,rustfmt" }
 
+[tasks."build:front"]
+description = "Install the locked frontend dependencies and build the production static output"
+dir = "{{config_root}}/frontend"
+run = ["deno install --frozen", "deno task build"]
+
+[tasks.check]
+description = "Run the frontend and backend checks"
+depends = ["check:front", "check:back"]
+
+[tasks."check:front"]
+description = "Type check the frontend with svelte-check and lint it with deno lint"
+dir = "{{config_root}}/frontend"
+run = ["deno install --frozen", "deno task check", "deno lint"]
+
+[tasks.dev]
+description = "Run the headless server and the Vite dev server together until interrupted"
+depends = ["dev:back", "dev:front"]
+
+[tasks."dev:back"]
+description = "Run the headless server, for restarting it independently of Vite"
+run = "cargo run -p miniban-server --features headless"
+
+[tasks."dev:front"]
+description = "Run the Vite dev server, proxying /api to the local server"
+dir = "{{config_root}}/frontend"
+run = ["deno install --frozen", "deno task dev"]
+
 [tasks.test]
 description = "Run the workspace tests with the headless server"
 run = "cargo test --workspace --features miniban-server/headless"

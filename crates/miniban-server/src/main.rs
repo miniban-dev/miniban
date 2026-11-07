@@ -7,6 +7,8 @@
 
 mod app;
 mod config;
+#[cfg(not(feature = "headless"))]
+mod frontend;
 
 use std::error::Error;
 use std::process::ExitCode;

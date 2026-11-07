@@ -19,6 +19,8 @@ pub fn router() -> Router {
 
     #[cfg(feature = "headless")]
     let app = app.fallback(frontend_not_included);
+    #[cfg(not(feature = "headless"))]
+    let app = app.fallback_service(get(crate::frontend::serve));
 
     app
 }
@@ -49,7 +51,7 @@ async fn frontend_not_included() -> (StatusCode, &'static str) {
 #[cfg(test)]
 mod tests {
     use axum::body::{Body, to_bytes};
-    use axum::http::{Request, StatusCode, header};
+    use axum::http::{Method, Request, StatusCode, header};
     use axum::response::Response;
     use serde_json::{Value, json};
     use tower::ServiceExt;
@@ -58,7 +60,16 @@ mod tests {
 
     /// Sends a GET request for `path` to the router without opening a socket.
     async fn get(path: &str) -> Response {
-        let request = Request::get(path).body(Body::empty()).unwrap();
+        send(Method::GET, path).await
+    }
+
+    /// Sends a `method` request for `path` to the router without opening a socket.
+    async fn send(method: Method, path: &str) -> Response {
+        let request = Request::builder()
+            .method(method)
+            .uri(path)
+            .body(Body::empty())
+            .unwrap();
         router().oneshot(request).await.unwrap()
     }
 
@@ -110,6 +121,138 @@ mod tests {
                 body, "This is a headless build: the frontend isn't included.",
                 "{path}"
             );
+        }
+    }
+
+    /// Router tests for the embedded frontend, with the build output on disk as the expected value.
+    #[cfg(not(feature = "headless"))]
+    mod embedded {
+        use std::path::{Path, PathBuf};
+
+        use super::*;
+
+        /// Reads a file from the frontend build output, given its path relative to the output root.
+        fn built_file(path: &str) -> Vec<u8> {
+            std::fs::read(build_dir().join(path)).unwrap()
+        }
+
+        /// Returns the frontend build output directory.
+        fn build_dir() -> PathBuf {
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../frontend/build")
+        }
+
+        /// Lists every file in the frontend build output, relative to the output root.
+        fn built_paths() -> Vec<String> {
+            let root = build_dir();
+            let mut directories = vec![root.clone()];
+            let mut paths = Vec::new();
+            while let Some(directory) = directories.pop() {
+                for entry in std::fs::read_dir(directory).unwrap() {
+                    let path = entry.unwrap().path();
+                    if path.is_dir() {
+                        directories.push(path);
+                    } else {
+                        let relative = path.strip_prefix(&root).unwrap();
+                        paths.push(relative.to_str().unwrap().to_owned());
+                    }
+                }
+            }
+            paths
+        }
+
+        #[tokio::test]
+        async fn browser_side_routes_return_the_html_document() {
+            for path in ["/", "/board/1", "/apiary", "/index.html"] {
+                let response = get(path).await;
+
+                assert_eq!(response.status(), StatusCode::OK, "{path}");
+                let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
+                assert_eq!(content_type, "text/html; charset=utf-8", "{path}");
+                let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+                assert!(bytes.starts_with(b"<!DOCTYPE html>"), "{path}");
+                assert_eq!(bytes.as_ref(), built_file("index.html"), "{path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn unknown_api_routes_do_not_return_the_frontend() {
+            let paths = ["/api/unknown", "/api/index.html", "/api/_app/version.json"];
+            for method in [Method::GET, Method::POST] {
+                for path in paths {
+                    let response = send(method.clone(), path).await;
+
+                    assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method} {path}");
+                    assert_eq!(json_body(response).await, json!({"error": "not found"}));
+                }
+            }
+        }
+
+        #[tokio::test]
+        async fn head_requests_describe_the_document_without_a_body() {
+            let response = send(Method::HEAD, "/board/1").await;
+
+            assert_eq!(response.status(), StatusCode::OK);
+            let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
+            assert_eq!(content_type, "text/html; charset=utf-8");
+            let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            assert!(bytes.is_empty());
+        }
+
+        #[tokio::test]
+        async fn other_methods_are_not_allowed_on_the_frontend() {
+            for path in ["/", "/board/1", "/_app/version.json"] {
+                let response = send(Method::POST, path).await;
+
+                assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED, "{path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn only_hashed_assets_are_cached_immutably() {
+            for path in built_paths() {
+                let response = get(&format!("/{path}")).await;
+
+                let cache_control = response.headers().get(header::CACHE_CONTROL).unwrap();
+                let expected = if path.starts_with("_app/immutable/") {
+                    "public, max-age=31536000, immutable"
+                } else {
+                    "no-cache"
+                };
+                assert_eq!(cache_control, expected, "{path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn browser_side_routes_are_never_cached_immutably() {
+            for path in ["/", "/board/1", "/_app/immutable/missing.js"] {
+                let response = get(path).await;
+
+                let cache_control = response.headers().get(header::CACHE_CONTROL).unwrap();
+                assert_eq!(cache_control, "no-cache", "{path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn every_built_file_is_served_directly_with_a_known_mime_type() {
+            let paths = built_paths();
+            assert!(!paths.is_empty());
+
+            for path in paths {
+                let response = get(&format!("/{path}")).await;
+
+                assert_eq!(response.status(), StatusCode::OK, "{path}");
+                let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
+                let expected = match path.rsplit_once('.').unwrap().1 {
+                    "html" => "text/html; charset=utf-8",
+                    "js" => "text/javascript; charset=utf-8",
+                    "css" => "text/css; charset=utf-8",
+                    "json" => "application/json",
+                    other => panic!("add `.{other}` to the frontend MIME table and here"),
+                };
+                assert_eq!(content_type, expected, "{path}");
+                let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+                assert_eq!(bytes.as_ref(), built_file(&path), "{path}");
+            }
         }
     }
 }

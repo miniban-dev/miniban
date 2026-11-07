@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+#MISE description="Check the API and CLI of the release binaries, using port 3101"
+
+# Checks the HTTP API contract of the release miniban and that the release mb works alone. Needs a prior
+# mise run build:release.
+
+set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+# Checks that a GET request returns JSON with exactly this status and body.
+expect_json() {
+  get "$1"
+  expect_equal "GET $1: status" "$2" "$response_status"
+  expect_equal "GET $1: content type" application/json "$response_type"
+  expect_equal "GET $1: body" "$3" "$response_body"
+  echo "smoke: ok: GET $1 returns $2 with $3"
+}
+
+run_mb --help
+run_mb --version
+
+start_server 3101
+expect_json /api/health 200 '{"status":"ok"}'
+expect_json /api/unknown 404 '{"error":"not found"}'

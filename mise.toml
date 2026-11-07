@@ -28,6 +28,21 @@ run = [
   'echo "mb: ${CARGO_TARGET_DIR:-{{config_root}}/target}/release/mb"',
 ]
 
+[tasks.ci]
+description = "Run every check CI runs, stopping at the first failure"
+run = [
+  { task = "fmt:check" },
+  { task = "check" },
+  { task = "test" },
+  { task = "check:embedded" },
+  { task = "build:release" },
+  { task = "smoke" },
+]
+
+[tasks.smoke]
+description = "Run the smoke tests against the release binaries from the last build:release"
+depends = ["smoke:back", "smoke:front"]
+
 [tasks.check]
 description = "Run the frontend and backend checks"
 depends = ["check:front", "check:back"]

@@ -14,18 +14,24 @@ run = [{ task = "build:front" }, { task = "build:back" }]
 description = "Build the debug executables, embedding the frontend that was last built"
 run = "cargo build --workspace"
 
+[tasks."install:front"]
+description = "Install the locked frontend dependencies, for the frontend tasks that need them"
+hide = true
+dir = "{{config_root}}/frontend"
+run = "deno install --frozen"
+
 [tasks."build:front"]
 description = "Install the locked frontend dependencies and build the production static output"
+depends = ["install:front"]
 dir = "{{config_root}}/frontend"
-run = ["deno install --frozen", "deno task build"]
+run = "deno task build"
 
 [tasks."build:release"]
 description = "Build the frontend, then the release executables, then report their paths"
 depends = ["build:front"]
 run = [
   "cargo build --workspace --release",
-  'echo "miniban: ${CARGO_TARGET_DIR:-{{config_root}}/target}/release/miniban"',
-  'echo "mb: ${CARGO_TARGET_DIR:-{{config_root}}/target}/release/mb"',
+  'for bin in miniban mb; do echo "$bin: ${CARGO_TARGET_DIR:-{{config_root}}/target}/release/$bin"; done',
 ]
 
 [tasks.ci]
@@ -49,8 +55,9 @@ depends = ["check:front", "check:back"]
 
 [tasks."check:front"]
 description = "Type check the frontend with svelte-check and lint it with deno lint"
+depends = ["install:front"]
 dir = "{{config_root}}/frontend"
-run = ["deno install --frozen", "deno task check", "deno lint"]
+run = ["deno task check", "deno lint"]
 
 [tasks.dev]
 description = "Run the headless server and the Vite dev server together until interrupted"
@@ -62,8 +69,9 @@ run = "cargo run -p miniban-server --features headless"
 
 [tasks."dev:front"]
 description = "Run the Vite dev server, proxying /api to the local server"
+depends = ["install:front"]
 dir = "{{config_root}}/frontend"
-run = ["deno install --frozen", "deno task dev"]
+run = "deno task dev"
 
 [tasks.test]
 description = "Run the workspace tests with the headless server"

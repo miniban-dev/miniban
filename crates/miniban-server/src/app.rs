@@ -57,9 +57,10 @@ async fn frontend_not_included() -> (StatusCode, &'static str) {
 // END OF BUSINESS LOGIC - TESTS BELOW HERE
 // -------------------------------------------------------------------------------------------------
 
+/// Router tests that send requests in process, without opening a socket.
 #[cfg(test)]
 mod tests {
-    use axum::body::{Body, to_bytes};
+    use axum::body::{Body, Bytes, to_bytes};
     use axum::http::{Method, Request, StatusCode, header};
     use axum::response::Response;
     use serde_json::{Value, json};
@@ -82,12 +83,21 @@ mod tests {
         router().oneshot(request).await.unwrap()
     }
 
+    /// Returns the content type that `response` declares.
+    fn content_type(response: &Response) -> &str {
+        let value = response.headers().get(header::CONTENT_TYPE).unwrap();
+        value.to_str().unwrap()
+    }
+
+    /// Reads the whole body of `response`.
+    async fn body_bytes(response: Response) -> Bytes {
+        to_bytes(response.into_body(), usize::MAX).await.unwrap()
+    }
+
     /// Asserts that `response` declares a JSON body, and returns it parsed.
     async fn json_body(response: Response) -> Value {
-        let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
-        assert_eq!(content_type, "application/json");
-        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-        serde_json::from_slice(&bytes).unwrap()
+        assert_eq!(content_type(&response), "application/json");
+        serde_json::from_slice(&body_bytes(response).await).unwrap()
     }
 
     #[tokio::test]
@@ -139,13 +149,8 @@ mod tests {
             let response = get(path).await;
 
             assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
-            let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
-            assert!(
-                content_type.to_str().unwrap().starts_with("text/plain"),
-                "{path}"
-            );
-            let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-            let body = String::from_utf8(bytes.to_vec()).unwrap();
+            assert!(content_type(&response).starts_with("text/plain"), "{path}");
+            let body = String::from_utf8(body_bytes(response).await.to_vec()).unwrap();
             assert_eq!(
                 body, "This is a headless build: the frontend isn't included.",
                 "{path}"
@@ -195,9 +200,12 @@ mod tests {
                 let response = get(path).await;
 
                 assert_eq!(response.status(), StatusCode::OK, "{path}");
-                let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
-                assert_eq!(content_type, "text/html; charset=utf-8", "{path}");
-                let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+                assert_eq!(
+                    content_type(&response),
+                    "text/html; charset=utf-8",
+                    "{path}"
+                );
+                let bytes = body_bytes(response).await;
                 assert!(bytes.starts_with(b"<!DOCTYPE html>"), "{path}");
                 assert_eq!(bytes.as_ref(), built_file("index.html"), "{path}");
             }
@@ -221,10 +229,8 @@ mod tests {
             let response = send(Method::HEAD, "/board/1").await;
 
             assert_eq!(response.status(), StatusCode::OK);
-            let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
-            assert_eq!(content_type, "text/html; charset=utf-8");
-            let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-            assert!(bytes.is_empty());
+            assert_eq!(content_type(&response), "text/html; charset=utf-8");
+            assert!(body_bytes(response).await.is_empty());
         }
 
         #[tokio::test]
@@ -270,7 +276,6 @@ mod tests {
                 let response = get(&format!("/{path}")).await;
 
                 assert_eq!(response.status(), StatusCode::OK, "{path}");
-                let content_type = response.headers().get(header::CONTENT_TYPE).unwrap();
                 let expected = match path.rsplit_once('.').unwrap().1 {
                     "html" => "text/html; charset=utf-8",
                     "js" => "text/javascript; charset=utf-8",
@@ -278,9 +283,12 @@ mod tests {
                     "json" => "application/json",
                     other => panic!("add `.{other}` to the frontend MIME table and here"),
                 };
-                assert_eq!(content_type, expected, "{path}");
-                let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-                assert_eq!(bytes.as_ref(), built_file(&path), "{path}");
+                assert_eq!(content_type(&response), expected, "{path}");
+                assert_eq!(
+                    body_bytes(response).await.as_ref(),
+                    built_file(&path),
+                    "{path}"
+                );
             }
         }
     }

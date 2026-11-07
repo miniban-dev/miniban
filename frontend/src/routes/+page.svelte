@@ -1,5 +1,7 @@
 <!-- Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details) -->
 
+<!-- @component The placeholder page: the product name, a description, and the server's status. -->
+
 <script lang="ts">
 import { onMount } from "svelte";
 

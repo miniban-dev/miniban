@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 pub fn router() -> Router {
     let api = Router::new()
         .route("/health", get(health))
+        .method_not_allowed_fallback(api_method_not_allowed)
         .fallback(api_not_found);
     // The nested catch-all doesn't match an empty remainder, so `/api/` needs its own route.
     let app = Router::new()
@@ -33,6 +34,14 @@ async fn health() -> Json<Value> {
 /// Answers API routes that don't exist.
 async fn api_not_found() -> (StatusCode, Json<Value>) {
     (StatusCode::NOT_FOUND, Json(json!({"error": "not found"})))
+}
+
+/// Answers API routes that exist but don't support the request's method.
+async fn api_method_not_allowed() -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        Json(json!({"error": "method not allowed"})),
+    )
 }
 
 /// Answers non-API routes in a headless build, which has no frontend to serve.
@@ -99,6 +108,26 @@ mod tests {
                 json_body(response).await,
                 json!({"error": "not found"}),
                 "{path}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn unsupported_methods_on_api_routes_return_a_json_405() {
+        for method in [Method::POST, Method::DELETE] {
+            let response = send(method.clone(), "/api/health").await;
+
+            assert_eq!(
+                response.status(),
+                StatusCode::METHOD_NOT_ALLOWED,
+                "{method}"
+            );
+            let allow = response.headers().get(header::ALLOW).unwrap();
+            assert_eq!(allow, "GET,HEAD", "{method}");
+            assert_eq!(
+                json_body(response).await,
+                json!({"error": "method not allowed"}),
+                "{method}"
             );
         }
     }

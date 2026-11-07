@@ -104,10 +104,24 @@ embedded configuration gets its own Clippy and test run in `check:embedded`, so 
 | Runtime needs   | Deno and the source tree               | The executable alone                  |
 
 Both give the browser the same same-origin contract, since Vite's proxy keeps requests relative. The proxy targets
-`MINIBAN_HOST` and `MINIBAN_PORT`, with the server's defaults.
+`MINIBAN_HOST` and `MINIBAN_PORT` from the process environment, with the server's defaults. It ignores `frontend/.env*`
+files, which the server can't see.
 
 `mise run dev` runs `cargo run -p miniban-server --features headless`, which replaces `target/debug/miniban` with a headless binary until
 the next `mise run build:back`. The startup warning makes this visible.
+
+### Plain Cargo
+
+`mise run check` and `mise run test` are the normal route. Plain Cargo also works, and on a fresh clone these forms need
+no frontend build:
+
+```sh
+cargo clippy --workspace --all-targets --features miniban-server/headless -- -D warnings
+cargo test --workspace --features miniban-server/headless
+cargo run -p miniban-cli -- --help
+```
+
+`cargo run -p miniban-server` needs a prior `mise run build:front`, or `--features headless`.
 
 ## `miniban` and `mb`
 

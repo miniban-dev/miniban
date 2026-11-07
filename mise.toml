@@ -1,0 +1,98 @@
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+
+[tools]
+deno = "2.9.8"
+dprint = "0.64.3"
+gh = "2.102.0"
+rust = { version = "1.99.1", components = "clippy,rustfmt" }
+
+[tasks.build]
+description = "Build the frontend, then the debug backend"
+run = [{ task = "build:front" }, { task = "build:back" }]
+
+[tasks."build:back"]
+description = "Build the debug executables, embedding the frontend that was last built"
+run = "cargo build --workspace"
+
+[tasks."install:front"]
+description = "Install the locked frontend dependencies, for the frontend tasks that need them"
+hide = true
+dir = "{{config_root}}/frontend"
+run = "deno install --frozen"
+
+[tasks."build:front"]
+description = "Install the locked frontend dependencies and build the production static output"
+depends = ["install:front"]
+dir = "{{config_root}}/frontend"
+run = "deno task build"
+
+[tasks."build:release"]
+description = "Build the frontend, then the release executables, then report their paths"
+depends = ["build:front"]
+run = [
+  "cargo build --workspace --release",
+  'for bin in miniban mb; do echo "$bin: ${CARGO_TARGET_DIR:-{{config_root}}/target}/release/$bin"; done',
+]
+
+[tasks.ci]
+description = "Run every check CI runs, stopping at the first failure"
+run = [
+  { task = "fmt:check" },
+  { task = "check" },
+  { task = "test" },
+  { task = "check:embedded" },
+  { task = "build:release" },
+  { task = "smoke" },
+]
+
+[tasks.smoke]
+description = "Run the smoke tests against the release binaries from the last build:release"
+depends = ["smoke:back", "smoke:front"]
+
+[tasks.check]
+description = "Run the frontend and backend checks"
+depends = ["check:front", "check:back"]
+
+[tasks."check:front"]
+description = "Type check the frontend with svelte-check and lint it with deno lint"
+depends = ["install:front"]
+dir = "{{config_root}}/frontend"
+run = ["deno task check", "deno lint"]
+
+[tasks.dev]
+description = "Run the headless server and the Vite dev server together until interrupted"
+depends = ["dev:back", "dev:front"]
+
+[tasks."dev:back"]
+description = "Run the headless server, for restarting it independently of Vite"
+run = "cargo run -p miniban-server --features headless"
+
+[tasks."dev:front"]
+description = "Run the Vite dev server, proxying /api to the local server"
+depends = ["install:front"]
+dir = "{{config_root}}/frontend"
+run = "deno task dev"
+
+[tasks.test]
+description = "Run the workspace tests with the headless server"
+run = "cargo test --workspace --features miniban-server/headless"
+
+[tasks."check:back"]
+description = "Run Clippy on all targets with the headless server and warnings as errors"
+run = "cargo clippy --workspace --all-targets --features miniban-server/headless -- -D warnings"
+
+[tasks."check:embedded"]
+description = "Build the frontend, then run Clippy and the tests with it embedded"
+depends = ["build:front"]
+run = [
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo test --workspace",
+]
+
+[tasks.fmt]
+description = "Format the whole repository"
+run = ["dprint fmt", "cargo fmt --all"]
+
+[tasks."fmt:check"]
+description = "Verify formatting across the whole repository"
+run = ["dprint check", "cargo fmt --all -- --check"]

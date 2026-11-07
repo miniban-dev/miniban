@@ -1,0 +1,9 @@
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+
+node_modules
+/.svelte-kit
+/build
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*

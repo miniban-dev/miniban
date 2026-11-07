@@ -1,0 +1,8 @@
+# Copyright (c) 2026 Braden Hitchcock - AGPL-3.0-only (see LICENSE for details)
+
+.DS_Store
+.env
+.env.*
+/target/
+
+.claude/worktrees

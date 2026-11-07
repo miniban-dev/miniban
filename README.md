@@ -87,7 +87,8 @@ Two things to know about `dev`:
 - It leaves `target/debug/miniban` headless until the next `mise run build:back`. A headless server logs a warning at
   startup and answers non-API routes with a 404 saying the frontend isn't included.
 
-If you set `MINIBAN_HOST` or `MINIBAN_PORT`, export them where both processes can see them: the Vite proxy reads them too.
+If you set `MINIBAN_HOST` or `MINIBAN_PORT`, export them where both processes can see them: the Vite proxy reads them too,
+from the process environment and not from `frontend/.env*` files.
 
 ## Release builds
 

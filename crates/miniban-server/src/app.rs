@@ -32,7 +32,7 @@ async fn health() -> Json<Value> {
 }
 
 /// Answers API routes that don't exist.
-async fn api_not_found() -> (StatusCode, Json<Value>) {
+pub async fn api_not_found() -> (StatusCode, Json<Value>) {
     (StatusCode::NOT_FOUND, Json(json!({"error": "not found"})))
 }
 
@@ -221,6 +221,28 @@ mod tests {
                     assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method} {path}");
                     assert_eq!(json_body(response).await, json!({"error": "not found"}));
                 }
+            }
+        }
+
+        #[tokio::test]
+        async fn paths_with_empty_segments_do_not_return_the_frontend() {
+            let paths = [
+                "//api/nope",
+                "//api/health",
+                "///api/health",
+                "//board/1",
+                "/board//1",
+                "//_app/version.json",
+            ];
+            for path in paths {
+                let response = get(path).await;
+
+                assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+                assert_eq!(
+                    json_body(response).await,
+                    json!({"error": "not found"}),
+                    "{path}"
+                );
             }
         }
 

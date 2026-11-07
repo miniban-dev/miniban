@@ -6,6 +6,8 @@ use axum::http::{Uri, header};
 use axum::response::{IntoResponse, Response};
 use rust_embed::RustEmbed;
 
+use crate::app::api_not_found;
+
 /// The name of the document returned for browser-side routes.
 const FALLBACK_DOCUMENT: &str = "index.html";
 
@@ -18,7 +20,12 @@ const HASHED_ASSETS_PREFIX: &str = "_app/immutable/";
 struct Assets;
 
 /// Serves the embedded file at the request's path, or the fallback document if there is none.
+///
+/// Paths with empty segments, such as `//board/1`, get the 404 that the API uses.
 pub async fn serve(uri: Uri) -> Response {
+    if uri.path().contains("//") {
+        return api_not_found().await.into_response();
+    }
     let path = uri.path().trim_start_matches('/');
     let (path, file) = match Assets::get(path) {
         Some(file) => (path, file),

@@ -52,6 +52,7 @@ The contract is JSON over HTTP on relative paths, so the frontend is always same
 | `GET /api/health`          | 200 with `{"status":"ok"}`                            |
 | Other method on that route | 405 with `{"error":"method not allowed"}`             |
 | Any other `/api` route     | 404 with `{"error":"not found"}`, never the frontend  |
+| Path with an empty segment | 404 with `{"error":"not found"}`, never the frontend  |
 | Path to an embedded file   | The file                                              |
 | Any other non-API path     | 200 with `index.html`, so browser-side routes refresh |
 | Any non-API path, headless | 404 in plain text saying the frontend isn't included  |

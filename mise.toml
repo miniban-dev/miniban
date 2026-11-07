@@ -6,10 +6,27 @@ dprint = "0.64.3"
 gh = "2.102.0"
 rust = { version = "1.99.1", components = "clippy,rustfmt" }
 
+[tasks.build]
+description = "Build the frontend, then the debug backend"
+run = [{ task = "build:front" }, { task = "build:back" }]
+
+[tasks."build:back"]
+description = "Build the debug executables, embedding the frontend that was last built"
+run = "cargo build --workspace"
+
 [tasks."build:front"]
 description = "Install the locked frontend dependencies and build the production static output"
 dir = "{{config_root}}/frontend"
 run = ["deno install --frozen", "deno task build"]
+
+[tasks."build:release"]
+description = "Build the frontend, then the release executables, then report their paths"
+depends = ["build:front"]
+run = [
+  "cargo build --workspace --release",
+  'echo "miniban: ${CARGO_TARGET_DIR:-{{config_root}}/target}/release/miniban"',
+  'echo "mb: ${CARGO_TARGET_DIR:-{{config_root}}/target}/release/mb"',
+]
 
 [tasks.check]
 description = "Run the frontend and backend checks"
@@ -40,6 +57,14 @@ run = "cargo test --workspace --features miniban-server/headless"
 [tasks."check:back"]
 description = "Run Clippy on all targets with the headless server and warnings as errors"
 run = "cargo clippy --workspace --all-targets --features miniban-server/headless -- -D warnings"
+
+[tasks."check:embedded"]
+description = "Build the frontend, then run Clippy and the tests with it embedded"
+depends = ["build:front"]
+run = [
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo test --workspace",
+]
 
 [tasks.fmt]
 description = "Format the whole repository"
